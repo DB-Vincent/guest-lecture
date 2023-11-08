@@ -1,0 +1,5 @@
+---
+- name: Join the Kubernetes cluster
+  shell: kubeadm join --token {{ kubeadm_token }} --discovery-token-ca-cert-hash sha256:{{ hostvars[item]['ca_cert_hash'] }} {{ hostvars[groups['master'][0]].ansible_host }}:6443
+  with_items: "{{ groups['master'] }}"
+  register: join_cluster

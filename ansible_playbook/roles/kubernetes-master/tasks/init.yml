@@ -1,0 +1,58 @@
+---
+- name: Reset Kubernetes component
+  shell: "kubeadm reset --force --cri-socket=/var/run/crio/crio.sock"
+  register: reset_cluster
+- name: Create kubeadm configuration file
+  copy:
+    dest: "/tmp/kubeadm-config.yml"
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: ClusterConfiguration
+      kubernetesVersion: v{{ kube_version }}
+      controllerManager:
+        extraArgs: 
+          flex-volume-plugin-dir: "{{ kubeadm_flex_volume_dir }}"
+      networking:
+        podSubnet: {{ pod_network_cidr }}
+      ---
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: InitConfiguration
+      bootstrapTokens:
+      - token: "{{ kubeadm_token }}"
+        description: "kubeadm bootstrap token"
+        ttl: "24h"
+- name: Initialize Kubernetes cluster
+  when: reset_cluster is succeeded
+  shell: kubeadm init --config "/tmp/kubeadm-config.yml" {{ kubeadm_extra_opts }}
+  register: init_cluster
+- name: Retrieve discovery token CA cert hash
+  when: init_cluster is succeeded
+  shell: openssl x509 -in /etc/kubernetes/pki/ca.crt -noout -pubkey | openssl rsa -pubin -outform DER 2>/dev/null | sha256sum | cut -d' ' -f1
+  register: ca_cert_hash_output
+- name: Set discovery token CA cert hash fact
+  set_fact:
+    ca_cert_hash: "{{ ca_cert_hash_output.stdout }}"
+- name: Create Kubernetes config directory
+  file:
+    path: "~/.kube/"
+    state: directory
+- name: Copy admin.conf to ansible's home directory
+  when: init_cluster is succeeded
+  copy:
+    src: "/etc/kubernetes/admin.conf"
+    dest: "~/.kube/config"
+    owner: "{{ ansible_user | default(ansible_user_id) }}"
+    group: "{{ ansible_user | default(ansible_user_id) }}"
+    mode: 0755
+    remote_src: true
+- name: Wait for CoreDNS to start up
+  when: init_cluster is succeeded
+  shell: kubectl wait deployment -n kube-system coredns --for condition=Available=True --timeout=90s
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
+  register: coredns_ready
+- name: Install Kubernetes networking with Flannel
+  when: (init_cluster is succeeded) and (coredns_ready is succeeded)
+  shell: kubectl apply -f https://github.com/flannel-io/flannel/releases/download/{{ flannel_version }}/kube-flannel.yml
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"

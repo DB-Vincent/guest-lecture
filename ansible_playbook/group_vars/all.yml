@@ -1,0 +1,10 @@
+# Kubernetes
+kube_version: "1.27.3"
+crio_version: "1.26.1"
+flannel_version: "v0.21.4"
+
+# Kubeadm
+kubeadm_token: "9rjdr9.52lb0kbevadyju7z"
+kubeadm_flex_volume_dir: "/etc/kubernetes/kubelet-plugins/volume/exec"
+kubeadm_extra_opts: ""
+pod_network_cidr: "10.244.0.0/16"

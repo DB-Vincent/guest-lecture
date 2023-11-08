@@ -1,0 +1,10 @@
+---
+# Master
+- name: Check if Kubernetes cluster has been initialized
+  stat:
+    path: "/etc/kubernetes/pki/ca.key"
+  register: kubeadm_ca
+- name: Initialize cluster if needed
+  include_tasks: init.yml
+  when: (not kubeadm_ca.stat.exists)
+

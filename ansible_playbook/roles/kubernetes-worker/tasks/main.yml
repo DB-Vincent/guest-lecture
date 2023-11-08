@@ -1,0 +1,11 @@
+---
+# Workers
+- name: Check if node has joined cluster
+  stat:
+    path: "/etc/kubernetes/kubelet.conf"
+  register: kubelet_conf
+- name: Join the Kubernetes cluster
+  shell: kubeadm join --token {{ kubeadm_token }} --discovery-token-ca-cert-hash sha256:{{ hostvars[item]['ca_cert_hash'] }} {{ hostvars[groups['master'][0]].ansible_host }}:6443
+  with_items: "{{ groups['master'] }}"
+  register: join_cluster
+  when: (not kubelet_conf.stat.exists) and (inventory_hostname in groups["worker"])

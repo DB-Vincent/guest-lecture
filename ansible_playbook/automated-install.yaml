@@ -1,0 +1,12 @@
+- hosts: all
+  become: true
+  roles:
+    - common
+- hosts: master
+  become: true
+  roles:
+    - kubernetes-master
+- hosts: worker
+  become: true
+  roles:
+    - kubernetes-worker

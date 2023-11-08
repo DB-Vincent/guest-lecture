@@ -1,0 +1,35 @@
+---
+- name: Set the node's hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+    use: systemd
+  register: node_hostname
+- name: Install Kubernetes required packages
+  community.general.rpm_ostree_pkg:
+    name:
+    - kubelet-{{ kube_version }}
+    - kubeadm-{{ kube_version }}
+    - cri-o-{{ crio_version }}
+    - libselinux-python3
+    state: present
+  register: kube_packages
+- name: Reboot to apply changes
+  reboot:
+    msg: "Reboot initiated by Ansible"
+    connect_timeout: 5
+    reboot_timeout: 600
+    pre_reboot_delay: 0
+    post_reboot_delay: 30
+  when: node_hostname.changed or kube_packages.changed
+- name: Enable and start kubelet service
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+    enabled: true
+- name: Enable and start crio service
+  ansible.builtin.systemd:
+    name: crio
+    state: started
+    enabled: true
+- name: Make sure resolv.conf file is linked properly
+  shell: ln -vfns /run/systemd/resolve/resolv.conf /etc/resolv.conf
